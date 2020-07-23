@@ -1273,7 +1273,7 @@ static void nsvg__initPaint(NSVGcachedPaint* cache, NSVGpaint* paint, float opac
 	cache->type = paint->type;
 
 	if (paint->type == NSVG_PAINT_COLOR) {
-		cache->colors[0] = nsvg__applyOpacity(paint->color, opacity);
+		cache->colors[0] = nsvg__applyOpacity(paint->color, paint->opacity * opacity);
 		return;
 	}
 
@@ -1287,13 +1287,13 @@ static void nsvg__initPaint(NSVGcachedPaint* cache, NSVGpaint* paint, float opac
 			cache->colors[i] = 0;
 	} if (grad->nstops == 1) {
 		for (i = 0; i < 256; i++)
-			cache->colors[i] = nsvg__applyOpacity(grad->stops[i].color, opacity);
+			cache->colors[i] = nsvg__applyOpacity(grad->stops[i].color, grad->stops[i].opacity * paint->opacity * opacity);
 	} else {
 		unsigned int ca, cb = 0;
 		float ua, ub, du, u;
 		int ia, ib, count;
 
-		ca = nsvg__applyOpacity(grad->stops[0].color, opacity);
+		ca = nsvg__applyOpacity(grad->stops[0].color, grad->stops[0].opacity * paint->opacity * opacity);
 		ua = nsvg__clampf(grad->stops[0].offset, 0, 1);
 		ub = nsvg__clampf(grad->stops[grad->nstops-1].offset, ua, 1);
 		ia = (int)(ua * 255.0f);
@@ -1303,8 +1303,8 @@ static void nsvg__initPaint(NSVGcachedPaint* cache, NSVGpaint* paint, float opac
 		}
 
 		for (i = 0; i < grad->nstops-1; i++) {
-			ca = nsvg__applyOpacity(grad->stops[i].color, opacity);
-			cb = nsvg__applyOpacity(grad->stops[i+1].color, opacity);
+			ca = nsvg__applyOpacity(grad->stops[i].color, grad->stops[i].opacity * paint->opacity * opacity);
+			cb = nsvg__applyOpacity(grad->stops[i+1].color, grad->stops[i+1].opacity * paint->opacity * opacity);
 			ua = nsvg__clampf(grad->stops[i].offset, 0, 1);
 			ub = nsvg__clampf(grad->stops[i+1].offset, 0, 1);
 			ia = (int)(ua * 255.0f);

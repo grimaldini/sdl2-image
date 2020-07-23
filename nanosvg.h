@@ -109,6 +109,7 @@ enum NSVGflags {
 
 typedef struct NSVGgradientStop {
 	unsigned int color;
+	float opacity;
 	float offset;
 } NSVGgradientStop;
 
@@ -122,6 +123,7 @@ typedef struct NSVGgradient {
 
 typedef struct NSVGpaint {
 	char type;
+	float opacity;
 	union {
 		unsigned int color;
 		NSVGgradient* gradient;
@@ -199,7 +201,8 @@ NSVG_EXPORT void nsvgDelete(NSVGimage* image);
 #define NSVG_ALIGN_SLICE 2
 
 #define NSVG_NOTUSED(v) do { (void)(1 ? (void)0 : ( (void)(v) ) ); } while(0)
-#define NSVG_RGB(r, g, b) (((unsigned int)r) | ((unsigned int)g << 8) | ((unsigned int)b << 16))
+#define NSVG_RGB(r, g, b) NSVG_RGBA(r, g, b, 255)
+#define NSVG_RGBA(r, g, b, a) (((unsigned int)r) | ((unsigned int)g << 8) | ((unsigned int)b << 16) | ((unsigned int)a << 24))
 
 #ifdef _MSC_VER
 	#pragma warning (disable: 4996) // Switch off security warnings
@@ -1002,11 +1005,12 @@ static void nsvg__addShape(NSVGparser* p)
 	} else if (attr->hasFill == 1) {
 		shape->fill.type = NSVG_PAINT_COLOR;
 		shape->fill.color = attr->fillColor;
-		shape->fill.color |= (unsigned int)(attr->fillOpacity*255) << 24;
+		shape->fill.opacity = attr->fillOpacity;
 	} else if (attr->hasFill == 2) {
 		float inv[6], localBounds[4];
 		nsvg__xformInverse(inv, attr->xform);
 		nsvg__getLocalBounds(localBounds, shape, inv);
+		shape->fill.opacity = attr->fillOpacity;
 		shape->fill.gradient = nsvg__createGradient(p, attr->fillGradient, localBounds, &shape->fill.type);
 		if (shape->fill.gradient == NULL) {
 			shape->fill.type = NSVG_PAINT_NONE;
@@ -1019,11 +1023,12 @@ static void nsvg__addShape(NSVGparser* p)
 	} else if (attr->hasStroke == 1) {
 		shape->stroke.type = NSVG_PAINT_COLOR;
 		shape->stroke.color = attr->strokeColor;
-		shape->stroke.color |= (unsigned int)(attr->strokeOpacity*255) << 24;
+		shape->stroke.opacity = attr->strokeOpacity;
 	} else if (attr->hasStroke == 2) {
 		float inv[6], localBounds[4];
 		nsvg__xformInverse(inv, attr->xform);
 		nsvg__getLocalBounds(localBounds, shape, inv);
+		shape->stroke.opacity = attr->strokeOpacity;
 		shape->stroke.gradient = nsvg__createGradient(p, attr->strokeGradient, localBounds, &shape->stroke.type);
 		if (shape->stroke.gradient == NULL)
 			shape->stroke.type = NSVG_PAINT_NONE;
@@ -1255,6 +1260,19 @@ static unsigned int nsvg__parseColorRGB(const char* str)
 	}
 }
 
+static unsigned int nsvg__parseColorRGBA(const char* str)
+{
+   int r = -1, g = -1, b = -1;
+   float a = -1;
+   char s1[32]="", s2[32]="", s3[32]="";
+   sscanf(str + 5, "%d%[%%, \t]%d%[%%, \t]%d%[%%, \t]%f", &r, s1, &g, s2, &b, s3, &a);
+   if (strchr(s1, '%')) {
+	   return NSVG_RGBA((r*255)/100,(g*255)/100,(b*255)/100,(a*255)/100);
+   } else {
+	   return NSVG_RGBA(r,g,b,(a*255));
+   }
+}
+
 typedef struct NSVGNamedColor {
 	const char* name;
 	unsigned int color;
@@ -1436,6 +1454,8 @@ static unsigned int nsvg__parseColor(const char* str)
 		return nsvg__parseColorHex(str);
 	else if (len >= 4 && str[0] == 'r' && str[1] == 'g' && str[2] == 'b' && str[3] == '(')
 		return nsvg__parseColorRGB(str);
+	else if (len >= 5 && str[0] == 'r' && str[1] == 'g' && str[2] == 'b' && str[3] == 'a' && str[4] == '(')
+		return nsvg__parseColorRGBA(str);
 	return nsvg__parseColorName(str);
 }
 
@@ -2676,7 +2696,7 @@ static void nsvg__parseGradientStop(NSVGparser* p, const char** attr)
 
 	stop = &grad->stops[idx];
 	stop->color = curAttr->stopColor;
-	stop->color |= (unsigned int)(curAttr->stopOpacity*255) << 24;
+	stop->opacity = curAttr->stopOpacity;
 	stop->offset = curAttr->stopOffset;
 }
 
